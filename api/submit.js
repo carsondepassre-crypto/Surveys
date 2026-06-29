@@ -156,7 +156,7 @@ export default async function handler(req, res) {
       subject = `Financial Institution Evaluation - ${business || "Anonymous"}`;
     }
     await resend.emails.send({
-      from: "surveys@bighousepaymentsolutions.com",
+      from: "onboarding@resend.dev",
       to: EMAILS[phase],
       subject: subject,
       text: emailBody
