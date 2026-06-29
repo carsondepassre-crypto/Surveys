@@ -32,9 +32,9 @@ const CATEGORIES = {
 };
 
 const EMAILS = {
-  1: "sales@bighousepaymentsolutions.com",
-  2: "sales@bighousepaymentsolutions.com,taylor@bighousepaymentsolutions.com",
-  3: "james@bighousepaymentsolutions.com"
+  1: "carson@bighousepaymentsolutions.com",
+  2: "carson@bighousepaymentsolutions.com",
+  3: "carson@bighousepaymentsolutions.com"
 };
 
 function ratingLabel(percent){
