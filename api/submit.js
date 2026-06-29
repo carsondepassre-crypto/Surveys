@@ -2,36 +2,6 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const QUESTIONS = {
-  1: [
-    { cat: "Service & Support", qs: 5 },
-    { cat: "Pricing Transparency", qs: 5 },
-    { cat: "Technology & Payment Options", qs: 5 },
-    { cat: "Cost Reduction Opportunities", qs: 5 },
-    { cat: "Security & Compliance", qs: 4 },
-    { cat: "Overall Relationship", qs: 4 }
-  ],
-  2: [
-    { cat: "Your feedback", qs: 10 }
-  ],
-  3: [
-    { cat: "Proactive Engagement", qs: 6 },
-    { cat: "Comprehensive Solutions", qs: 8 },
-    { cat: "Strong Banker Engagement", qs: 8 },
-    { cat: "Partner Management", qs: 5 },
-    { cat: "Compliance & Risk", qs: 4 },
-    { cat: "Revenue Model", qs: 4 },
-    { cat: "Service & Support", qs: 4 },
-    { cat: "Merchant Satisfaction", qs: 5 }
-  ]
-};
-
-const EMAILS = {
-  1: "sales@bighousepaymentsolutions.com",
-  2: "sales@bighousepaymentsolutions.com,taylor@bighousepaymentsolutions.com",
-  3: "james@bighousepaymentsolutions.com"
-};
-
 const QUESTIONS_TEXT = {
   1: [
     ["Do you know the name of your merchant services representative?","Have you spoken with your representative in the past 12 months?","Does your provider proactively contact you to review your account?","Can you easily reach a live person when you need support?","Are support issues typically resolved within 24 hours?"],
@@ -56,22 +26,20 @@ const QUESTIONS_TEXT = {
   ]
 };
 
+const CATEGORIES = {
+  1: ["Service & Support", "Pricing Transparency", "Technology & Payment Options", "Cost Reduction Opportunities", "Security & Compliance", "Overall Relationship"],
+  3: ["Proactive Engagement", "Comprehensive Solutions", "Strong Banker Engagement", "Partner Management", "Compliance & Risk", "Revenue Model", "Service & Support", "Merchant Satisfaction"]
+};
+
+const EMAILS = {
+  1: "sales@bighousepaymentsolutions.com",
+  2: "sales@bighousepaymentsolutions.com,taylor@bighousepaymentsolutions.com",
+  3: "james@bighousepaymentsolutions.com"
+};
+
 function buildEmailPhase1(data) {
   const answers = data.answers;
-  let catIndex = 0;
-  let scoreText = "";
-  
-  QUESTIONS[1].forEach(cat => {
-    let catYes = 0;
-    for (let i = 0; i < cat.qs; i++) {
-      const key = catIndex + ":" + i;
-      if (answers[key] === "yes") catYes++;
-    }
-    scoreText += `${cat.cat}: ${catYes}/${cat.qs}\n`;
-    catIndex++;
-  });
-  
-  return `MERCHANT INFO
+  let emailBody = `MERCHANT INFO
 =====================================
 Business Name: ${data.business || "Anonymous"}
 Email: ${data.email || "Not provided"}
@@ -79,12 +47,27 @@ Phone: ${data.phone || "Not provided"}
 
 SURVEY RESULTS - New Merchant Check-up
 =====================================
-${scoreText}`;
+
+`;
+  
+  let catIndex = 0;
+  CATEGORIES[1].forEach(cat => {
+    let catYes = 0;
+    const qs = QUESTIONS_TEXT[1][catIndex];
+    for (let i = 0; i < qs.length; i++) {
+      const key = catIndex + ":" + i;
+      if (answers[key] === "yes") catYes++;
+    }
+    emailBody += `${cat}: ${catYes}/${qs.length}\n`;
+    catIndex++;
+  });
+  
+  return emailBody;
 }
 
 function buildEmailPhase2(data) {
   const answers = data.answers;
-  const allQuestions = QUESTIONS_TEXT[2][0];
+  const allQs = QUESTIONS_TEXT[2][0];
   
   let yesQuestions = [];
   let noQuestions = [];
@@ -93,28 +76,14 @@ function buildEmailPhase2(data) {
   Object.keys(answers).forEach(key => {
     if (key.startsWith("0:")) {
       const qIdx = parseInt(key.split(":")[1]);
-      const q = allQuestions[qIdx];
+      const q = allQs[qIdx];
       if (answers[key] === "yes") yesQuestions.push(q);
       else if (answers[key] === "no") noQuestions.push(q);
       else if (answers[key] === "notsure") notSureQuestions.push(q);
     }
   });
   
-  let breakdownText = `YES (${yesQuestions.length}):\n`;
-  yesQuestions.forEach(q => breakdownText += `• ${q}\n`);
-  breakdownText += `\nNO (${noQuestions.length}):\n`;
-  noQuestions.forEach(q => breakdownText += `• ${q}\n`);
-  breakdownText += `\nNOT SURE (${notSureQuestions.length}):\n`;
-  notSureQuestions.forEach(q => breakdownText += `• ${q}\n`);
-  
-  let feedbackSection = "";
-  if (data.feedback) {
-    feedbackSection = `\nWHAT COULD WE DO DIFFERENTLY?
-=====================================
-"${data.feedback}"\n`;
-  }
-  
-  return `CUSTOMER INFO
+  let emailBody = `CUSTOMER INFO
 =====================================
 Business Name: ${data.business || "Anonymous"}
 Email: ${data.email || "Not provided"}
@@ -128,25 +97,30 @@ Your Feedback
 ? Not Sure: ${notSureQuestions.length}
 
 BREAKDOWN:
-${breakdownText}${feedbackSection}`;
+
+YES (${yesQuestions.length}):
+`;
+  
+  yesQuestions.forEach(q => emailBody += `• ${q}\n`);
+  
+  emailBody += `\nNO (${noQuestions.length}):\n`;
+  noQuestions.forEach(q => emailBody += `• ${q}\n`);
+  
+  emailBody += `\nNOT SURE (${notSureQuestions.length}):\n`;
+  notSureQuestions.forEach(q => emailBody += `• ${q}\n`);
+  
+  if (data.feedback) {
+    emailBody += `\nWHAT COULD WE DO DIFFERENTLY?
+=====================================
+"${data.feedback}"\n`;
+  }
+  
+  return emailBody;
 }
 
 function buildEmailPhase3(data) {
   const answers = data.answers;
-  let catIndex = 0;
-  let scoreText = "";
-  
-  QUESTIONS[3].forEach(cat => {
-    let catYes = 0;
-    for (let i = 0; i < cat.qs; i++) {
-      const key = catIndex + ":" + i;
-      if (answers[key] === "yes") catYes++;
-    }
-    scoreText += `${cat.cat}: ${catYes}/${cat.qs}\n`;
-    catIndex++;
-  });
-  
-  return `INSTITUTION INFO
+  let emailBody = `INSTITUTION INFO
 =====================================
 Institution Name: ${data.business || "Anonymous"}
 Email: ${data.email || "Not provided"}
@@ -154,7 +128,22 @@ Phone: ${data.phone || "Not provided"}
 
 SURVEY RESULTS - Financial Institution Vendor Evaluation
 =====================================
-${scoreText}`;
+
+`;
+  
+  let catIndex = 0;
+  CATEGORIES[3].forEach(cat => {
+    let catYes = 0;
+    const qs = QUESTIONS_TEXT[3][catIndex];
+    for (let i = 0; i < qs.length; i++) {
+      const key = catIndex + ":" + i;
+      if (answers[key] === "yes") catYes++;
+    }
+    emailBody += `${cat}: ${catYes}/${qs.length}\n`;
+    catIndex++;
+  });
+  
+  return emailBody;
 }
 
 export default async function handler(req, res) {
