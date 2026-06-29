@@ -37,148 +37,130 @@ const EMAILS = {
   3: "james@bighousepaymentsolutions.com"
 };
 
-function buildEmailPhase1(data) {
+function ratingLabel(percent){
+  if(percent>=90) return "Strong";
+  if(percent>=71) return "Good";
+  if(percent>=50) return "Moderate";
+  return "At Risk";
+}
+
+function buildEmailPhase1or3(data, phase) {
   const answers = data.answers;
-  let emailBody = `MERCHANT INFO
+  const cats = CATEGORIES[phase];
+  const qtext = QUESTIONS_TEXT[phase];
+  const total = phase === 1 ? 28 : 44;
+  let yesTotal = 0;
+  Object.keys(answers).forEach(k => { if (answers[k] === "yes") yesTotal++; });
+  const percent = Math.round((yesTotal / total) * 100);
+
+  const infoLabel = phase === 1 ? "MERCHANT INFO" : "INSTITUTION INFO";
+  const nameLabel = phase === 1 ? "Business Name" : "Institution Name";
+
+  let body = `${infoLabel}
 =====================================
-Business Name: ${data.business || "Anonymous"}
+${nameLabel}: ${data.business || "Anonymous"}
 Email: ${data.email || "Not provided"}
 Phone: ${data.phone || "Not provided"}
 
-SURVEY RESULTS - New Merchant Check-up
+OVERALL SCORE: ${percent}/100 (${ratingLabel(percent)})
 =====================================
 
+SCORE BY CATEGORY
+=====================================
 `;
-  
   let catIndex = 0;
-  CATEGORIES[1].forEach(cat => {
+  cats.forEach(cat => {
     let catYes = 0;
-    const qs = QUESTIONS_TEXT[1][catIndex];
+    const qs = qtext[catIndex];
     for (let i = 0; i < qs.length; i++) {
-      const key = catIndex + ":" + i;
-      if (answers[key] === "yes") catYes++;
+      if (answers[catIndex + ":" + i] === "yes") catYes++;
     }
-    emailBody += `${cat}: ${catYes}/${qs.length}\n`;
+    body += `${cat}: ${catYes}/${qs.length}\n`;
     catIndex++;
   });
-  
-  return emailBody;
+  return body;
 }
 
 function buildEmailPhase2(data) {
   const answers = data.answers;
   const allQs = QUESTIONS_TEXT[2][0];
-  
-  let yesQuestions = [];
-  let noQuestions = [];
-  let notSureQuestions = [];
-  
+
+  let points = 0;
+  for (let i = 0; i < 9; i++) { if (answers["0:" + i] === "yes") points++; }
+  if (answers["0:9"] === "no") points++;
+  const percent = Math.round((points / 10) * 100);
+
+  let yesQ = [], noQ = [], notSureQ = [];
   Object.keys(answers).forEach(key => {
     if (key.startsWith("0:")) {
       const qIdx = parseInt(key.split(":")[1]);
       const q = allQs[qIdx];
-      if (answers[key] === "yes") yesQuestions.push(q);
-      else if (answers[key] === "no") noQuestions.push(q);
-      else if (answers[key] === "notsure") notSureQuestions.push(q);
+      if (answers[key] === "yes") yesQ.push(q);
+      else if (answers[key] === "no") noQ.push(q);
+      else if (answers[key] === "notsure") notSureQ.push(q);
     }
   });
-  
-  let emailBody = `CUSTOMER INFO
+
+  let body = `CUSTOMER INFO
 =====================================
 Business Name: ${data.business || "Anonymous"}
 Email: ${data.email || "Not provided"}
 Phone: ${data.phone || "Not provided"}
 
-SURVEY RESULTS - Existing Customer Feedback
+SATISFACTION SCORE: ${points}/10 (${percent}%)
 =====================================
-Your Feedback
-✓ Yes: ${yesQuestions.length}
-✗ No: ${noQuestions.length}
-? Not Sure: ${notSureQuestions.length}
 
-BREAKDOWN:
+SUMMARY
+=====================================
+Yes: ${yesQ.length}
+No: ${noQ.length}
+Not Sure: ${notSureQ.length}
 
-YES (${yesQuestions.length}):
+BREAKDOWN
+=====================================
+YES (${yesQ.length}):
 `;
-  
-  yesQuestions.forEach(q => emailBody += `• ${q}\n`);
-  
-  emailBody += `\nNO (${noQuestions.length}):\n`;
-  noQuestions.forEach(q => emailBody += `• ${q}\n`);
-  
-  emailBody += `\nNOT SURE (${notSureQuestions.length}):\n`;
-  notSureQuestions.forEach(q => emailBody += `• ${q}\n`);
-  
+  yesQ.forEach(q => body += `- ${q}\n`);
+  body += `\nNO (${noQ.length}):\n`;
+  noQ.forEach(q => body += `- ${q}\n`);
+  body += `\nNOT SURE (${notSureQ.length}):\n`;
+  notSureQ.forEach(q => body += `- ${q}\n`);
+
   if (data.feedback) {
-    emailBody += `\nWHAT COULD WE DO DIFFERENTLY?
+    body += `\nWHAT COULD WE DO DIFFERENTLY?
 =====================================
 "${data.feedback}"\n`;
   }
-  
-  return emailBody;
-}
-
-function buildEmailPhase3(data) {
-  const answers = data.answers;
-  let emailBody = `INSTITUTION INFO
-=====================================
-Institution Name: ${data.business || "Anonymous"}
-Email: ${data.email || "Not provided"}
-Phone: ${data.phone || "Not provided"}
-
-SURVEY RESULTS - Financial Institution Vendor Evaluation
-=====================================
-
-`;
-  
-  let catIndex = 0;
-  CATEGORIES[3].forEach(cat => {
-    let catYes = 0;
-    const qs = QUESTIONS_TEXT[3][catIndex];
-    for (let i = 0; i < qs.length; i++) {
-      const key = catIndex + ":" + i;
-      if (answers[key] === "yes") catYes++;
-    }
-    emailBody += `${cat}: ${catYes}/${qs.length}\n`;
-    catIndex++;
-  });
-  
-  return emailBody;
+  return body;
 }
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
-  
   const { phase, business, email, phone, answers, feedback } = req.body;
-  
   if (!phase || !answers) {
     return res.status(400).json({ error: "Missing required fields" });
   }
-  
   try {
     let emailBody = "";
     let subject = "";
-    
     if (phase === "1") {
-      emailBody = buildEmailPhase1({ business, email, phone, answers });
+      emailBody = buildEmailPhase1or3({ business, email, phone, answers }, 1);
       subject = `New Merchant Survey - ${business || "Anonymous"}`;
     } else if (phase === "2") {
       emailBody = buildEmailPhase2({ business, email, phone, answers, feedback });
       subject = `Customer Feedback - ${business || "Anonymous"}`;
     } else if (phase === "3") {
-      emailBody = buildEmailPhase3({ business, email, phone, answers });
+      emailBody = buildEmailPhase1or3({ business, email, phone, answers }, 3);
       subject = `Financial Institution Evaluation - ${business || "Anonymous"}`;
     }
-    
     await resend.emails.send({
       from: "surveys@bighousepaymentsolutions.com",
       to: EMAILS[phase],
       subject: subject,
       text: emailBody
     });
-    
     return res.status(200).json({ success: true });
   } catch (error) {
     console.error("Email error:", error);
