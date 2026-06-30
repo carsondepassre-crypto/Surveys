@@ -78,6 +78,32 @@ SCORE BY CATEGORY
     body += `${cat}: ${catYes}/${qs.length}\n`;
     catIndex++;
   });
+
+  // Detailed question-by-question breakdown, grouped by answer
+  let yesQ = [], noQ = [], notSureQ = [];
+  qtext.forEach((catQs, ci) => {
+    catQs.forEach((q, qi) => {
+      const a = answers[ci + ":" + qi];
+      if (a === "yes") yesQ.push(q);
+      else if (a === "no") noQ.push(q);
+      else if (a === "notsure") notSureQ.push(q);
+    });
+  });
+
+  const notSureLabel = phase === 3 ? "I DON'T KNOW" : "NOT SURE";
+
+  body += `
+
+DETAILED BREAKDOWN
+=====================================
+YES (${yesQ.length}):
+`;
+  yesQ.forEach(q => body += `- ${q}\n`);
+  body += `\nNO (${noQ.length}):\n`;
+  noQ.forEach(q => body += `- ${q}\n`);
+  body += `\n${notSureLabel} (${notSureQ.length}):\n`;
+  notSureQ.forEach(q => body += `- ${q}\n`);
+
   return body;
 }
 
